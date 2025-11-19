@@ -51,16 +51,14 @@ async def on_ready():
 
 ALLOWED_CHANNEL_ID = 1440731715713892362
 @bot.event
-@bot.event
 async def on_message(message):
-    # 1. Chặn bot tự nói chuyện một mình (Quan trọng)
     if message.author == bot.user:
         return
 
-    # 2. Logic xác định khi nào được trả lời:
-    # - Hoặc là được Tag
-    # - Hoặc là tin nhắn nằm trong kênh riêng (ALLOWED_CHANNEL_ID)
-    # - Hoặc là nhắn tin riêng (DM)
+    # --- CHECK KÊNH HOẶC TAG ---
+    # Nhớ thay ID kênh của bro vào chỗ số 000000 này nhé
+    ALLOWED_CHANNEL_ID = 112233445566778899 
+    
     should_reply = (
         bot.user.mentioned_in(message) or 
         message.channel.id == ALLOWED_CHANNEL_ID or 
@@ -68,21 +66,16 @@ async def on_message(message):
     )
 
     if should_reply:
-        # Xử lý tin nhắn (Phần này giữ nguyên như code cũ của bro)
         user_id = message.author.id
-        # Xóa tag bot ra khỏi tin nhắn để bot không đọc nhầm
         user_input = message.content.replace(f'<@{bot.user.id}>', '').strip()
         
-        # Nếu tin nhắn rỗng (do chỉ tag mà không nói gì) thì bỏ qua
         if not user_input:
             return
 
-        print(f"User: {user_input}")
-        
+        print(f"Đang xử lý cho {message.author}: {user_input}")
+
         async with message.channel.typing():
             try:
-                # ... (Logic gọi API aiohttp giữ nguyên y hệt đoạn code trước) ...
-                # Copy lại đoạn logic gọi API từ bài trước bỏ vào đây nhé
                 if user_id not in chat_histories:
                     chat_histories[user_id] = []
                 
@@ -95,31 +88,50 @@ async def on_message(message):
                 contents_payload.extend(history)
                 contents_payload.append({"role": "user", "parts": [{"text": user_input}]})
 
+                # --- CẤU HÌNH MỚI: TẮT BỘ LỌC AN TOÀN ---
                 payload = {
                     "contents": contents_payload,
-                    "generationConfig": {"temperature": 0.9, "maxOutputTokens": 500}
+                    "generationConfig": {
+                        "temperature": 0.9,
+                        "maxOutputTokens": 500
+                    },
+                    "safetySettings": [
+                        {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+                        {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+                        {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+                        {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}
+                    ]
                 }
+                # -----------------------------------------
 
                 async with aiohttp.ClientSession() as session:
                     async with session.post(API_URL, json=payload) as response:
                         if response.status == 200:
                             data = await response.json()
-                            ai_reply = data['candidates'][0]['content']['parts'][0]['text']
                             
-                            chat_histories[user_id].append({"role": "user", "parts": [{"text": user_input}]})
-                            chat_histories[user_id].append({"role": "model", "parts": [{"text": ai_reply}]})
-                            
-                            await message.reply(ai_reply)
+                            # Kiểm tra kỹ xem có câu trả lời không (Phòng hờ vẫn bị chặn)
+                            if 'candidates' in data and data['candidates'] and 'content' in data['candidates'][0]:
+                                ai_reply = data['candidates'][0]['content']['parts'][0]['text']
+                                
+                                chat_histories[user_id].append({"role": "user", "parts": [{"text": user_input}]})
+                                chat_histories[user_id].append({"role": "model", "parts": [{"text": ai_reply}]})
+                                
+                                await message.reply(ai_reply)
+                            else:
+                                # Nếu Google trả về 200 OK nhưng không có nội dung (Bị chặn hoàn toàn)
+                                print(f"Dữ liệu trả về lạ: {data}")
+                                await message.reply("Ah... Ta không biết phải nói sao (Google chặn câu trả lời này rồi).")
                         else:
-                            # ... xử lý lỗi ...
-                            await message.reply("Lỗi rồi...")
+                            error_text = await response.text()
+                            print(f"API Error: {error_text}")
+                            await message.reply(f"Google đang lỗi (Code {response.status}).")
 
             except Exception as e:
-                print(f"Lỗi: {e}")
+                # QUAN TRỌNG: In lỗi ra Discord để bro biết đường sửa
+                print(f"CRITICAL ERROR: {e}")
+                await message.reply(f"Code bị lỗi rồi bro ơi: {str(e)}")
 
-    # Dòng này quan trọng để bot vẫn chạy được các lệnh khác nếu có
     await bot.process_commands(message)
-
 # Chạy server ảo trước rồi mới chạy bot
 keep_alive()
 bot.run(DISCORD_TOKEN)
