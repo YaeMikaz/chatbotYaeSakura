@@ -49,43 +49,75 @@ async def on_ready():
     print(f'--- BOT ONLINE: {bot.user} ---')
     await bot.change_presence(activity=discord.Game(name="Honkai Impact 3rd"))
 
+ALLOWED_CHANNEL_ID = 1440731715713892362
+@bot.event
 @bot.event
 async def on_message(message):
+    # 1. Chặn bot tự nói chuyện một mình (Quan trọng)
     if message.author == bot.user:
         return
 
-    if bot.user.mentioned_in(message) or isinstance(message.channel, discord.DMChannel):
+    # 2. Logic xác định khi nào được trả lời:
+    # - Hoặc là được Tag
+    # - Hoặc là tin nhắn nằm trong kênh riêng (ALLOWED_CHANNEL_ID)
+    # - Hoặc là nhắn tin riêng (DM)
+    should_reply = (
+        bot.user.mentioned_in(message) or 
+        message.channel.id == ALLOWED_CHANNEL_ID or 
+        isinstance(message.channel, discord.DMChannel)
+    )
+
+    if should_reply:
+        # Xử lý tin nhắn (Phần này giữ nguyên như code cũ của bro)
         user_id = message.author.id
+        # Xóa tag bot ra khỏi tin nhắn để bot không đọc nhầm
         user_input = message.content.replace(f'<@{bot.user.id}>', '').strip()
         
-        print(f"Nhận tin nhắn từ {message.author}: {user_input}") # In log để debug
+        # Nếu tin nhắn rỗng (do chỉ tag mà không nói gì) thì bỏ qua
+        if not user_input:
+            return
 
+        print(f"User: {user_input}")
+        
         async with message.channel.typing():
             try:
-                # Kiểm tra session
-                if user_id not in chat_sessions:
-                    # MẸO: Gửi Persona vào history như là tin nhắn đầu tiên
-                    # Cách này giúp bypass mọi lỗi version của thư viện
-                    chat_sessions[user_id] = model.start_chat(history=[
-                        {'role': 'user', 'parts': [WAIFU_PERSONA]},
-                        {'role': 'model', 'parts': ["Đã rõ. Ta sẽ bắt đầu vai diễn ngay bây giờ."]}
-                    ])
+                # ... (Logic gọi API aiohttp giữ nguyên y hệt đoạn code trước) ...
+                # Copy lại đoạn logic gọi API từ bài trước bỏ vào đây nhé
+                if user_id not in chat_histories:
+                    chat_histories[user_id] = []
                 
-                chat = chat_sessions[user_id]
+                history = chat_histories[user_id][-10:]
                 
-                # Gửi tin nhắn
-                response = chat.send_message(user_input)
-                
-                # In phản hồi ra log để kiểm tra
-                print(f"Gemini trả lời: {response.text}")
-                
-                await message.reply(response.text)
+                contents_payload = [
+                    {"role": "user", "parts": [{"text": WAIFU_PROMPT + "\n\nBắt đầu hội thoại."}]},
+                    {"role": "model", "parts": [{"text": "Đã rõ."}]}
+                ]
+                contents_payload.extend(history)
+                contents_payload.append({"role": "user", "parts": [{"text": user_input}]})
+
+                payload = {
+                    "contents": contents_payload,
+                    "generationConfig": {"temperature": 0.9, "maxOutputTokens": 500}
+                }
+
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(API_URL, json=payload) as response:
+                        if response.status == 200:
+                            data = await response.json()
+                            ai_reply = data['candidates'][0]['content']['parts'][0]['text']
+                            
+                            chat_histories[user_id].append({"role": "user", "parts": [{"text": user_input}]})
+                            chat_histories[user_id].append({"role": "model", "parts": [{"text": ai_reply}]})
+                            
+                            await message.reply(ai_reply)
+                        else:
+                            # ... xử lý lỗi ...
+                            await message.reply("Lỗi rồi...")
 
             except Exception as e:
-                # In lỗi chi tiết ra log
-                print(f"LỖI NGHIÊM TRỌNG: {type(e).__name__} - {e}")
-                await message.reply(f"Hic, lỗi rồi: {e}")
+                print(f"Lỗi: {e}")
 
+    # Dòng này quan trọng để bot vẫn chạy được các lệnh khác nếu có
     await bot.process_commands(message)
 
 # Chạy server ảo trước rồi mới chạy bot
