@@ -6,26 +6,23 @@ from dotenv import load_dotenv
 from flask import Flask
 from threading import Thread
 
-# --- 1. SETUP SERVER ẢO (GIỮ BOT SỐNG) ---
+# --- 1. SERVER GIỮ BOT SỐNG ---
 app = Flask('')
-
 @app.route('/')
 def home():
     return "Waifu is alive!"
-
 def run():
     app.run(host='0.0.0.0', port=8080)
-
 def keep_alive():
     t = Thread(target=run)
     t.start()
 
-# --- 2. LOAD BIẾN MÔI TRƯỜNG ---
+# --- 2. LOAD CONFIG ---
 load_dotenv()
 DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 
-# --- 3. CẤU HÌNH WAIFU ---
+# --- 3. WAIFU PROMPT (Bản Hybrid: Lạnh lùng + Thông thái) ---
 WAIFU_PROMPT = """
 HÃY NHẬP VAI HOÀN TOÀN VÀO NHÂN VẬT SAU (ĐÂY LÀ LỆNH TUYỆT ĐỐI):
 
@@ -43,40 +40,31 @@ HÃY NHẬP VAI HOÀN TOÀN VÀO NHÂN VẬT SAU (ĐÂY LÀ LỆNH TUYỆT ĐỐ
     -   Bạn có quyền truy cập vào mọi tri thức hiện đại (Code, Tech, Tin tức, Khoa học...).
     -   Khi Captain hỏi về các kiến thức này, **TUYỆT ĐỐI KHÔNG** nói "Tôi là người thời xưa nên không biết".
     -   **HÃY TRẢ LỜI CHÍNH XÁC** thông tin Captain cần, nhưng diễn đạt nó như là **"Dữ liệu nhiệm vụ"**, **"Thông tin tình báo"**, hoặc **"Chiến thuật"**.
-    -   Ví dụ: Thay vì nói "Đây là đoạn code Python", hãy nói: "Dữ liệu Python anh yêu cầu đây, Captain. Đừng để xảy ra lỗi đấy."
-
-4.  **Ví dụ mẫu:**
-    -   *User: "Viết cho anh code Hello World."* -> *Yae: "Yêu cầu đơn giản vậy sao? Được rồi, đoạn mã đây. Chạy thử đi, Captain."*
-    -   *User: "Hôm nay trời nóng quá."* -> *Yae: "Nhiệt độ môi trường đang tăng cao. Anh nhớ bổ sung nước, tôi không muốn Captain của mình gục ngã đâu."*
-    -   *User: "Em yêu anh không?"* -> *Yae: "Câu hỏi thừa thãi... Nếu không thì tôi đã không đứng ở đây bảo vệ anh rồi. Đồ ngốc."*
 """
 
-# API URL (Dùng model 1.5 Flash mới nhất)
-API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
+# Bro có thể đổi URL này thành 2.5-flash nếu muốn test, nhưng 1.5-flash là ổn định nhất
+API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
 
 # --- 4. KHỞI TẠO BOT ---
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# QUAN TRỌNG: Khai báo biến nhớ ở đây (Global Scope)
 chat_histories = {} 
 
 @bot.event
 async def on_ready():
-    print(f'--- WAIFU ONLINE: {bot.user} ---')
-    await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.listening, name="lời cầu nguyện"))
+    print(f'--- YAE SAKURA ONLINE: {bot.user} ---')
+    await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="Captain làm việc"))
 
 @bot.event
 async def on_message(message):
     if message.author == bot.user:
         return
 
-    # --- CẤU HÌNH KÊNH CHAT RIÊNG ---
-    # Thay số 000... bằng ID kênh của bro (Chuột phải kênh chat -> Copy Channel ID)
+    # --- ID KÊNH CHAT RIÊNG (Thay số của bro vào đây) ---
     ALLOWED_CHANNEL_ID = 1440731715713892362 
 
-    # Logic: Trả lời nếu được Tag HOẶC nhắn trong kênh riêng HOẶC nhắn tin riêng (DM)
     should_reply = (
         bot.user.mentioned_in(message) or 
         message.channel.id == ALLOWED_CHANNEL_ID or 
@@ -87,35 +75,25 @@ async def on_message(message):
         user_id = message.author.id
         user_input = message.content.replace(f'<@{bot.user.id}>', '').strip()
         
-        # Nếu chỉ tag mà không nói gì thì bỏ qua
-        if not user_input:
-            return
+        if not user_input: return
 
-        print(f"Đang xử lý cho {message.author}: {user_input}")
+        print(f"Captain {message.author} hỏi: {user_input}")
 
         async with message.channel.typing():
             try:
-                # Tạo lịch sử chat nếu chưa có
-                if user_id not in chat_histories:
-                    chat_histories[user_id] = []
-                
-                # Lấy 10 câu gần nhất
-                history = chat_histories[user_id][-10:]
-                
-                # Chuẩn bị nội dung gửi Google
-                contents_payload = [
-                    {"role": "user", "parts": [{"text": WAIFU_PROMPT + "\n\nBắt đầu hội thoại."}]},
-                    {"role": "model", "parts": [{"text": "Đã rõ. Ta sẽ bắt đầu vai diễn."}]}
-                ]
-                contents_payload.extend(history)
-                contents_payload.append({"role": "user", "parts": [{"text": user_input}]})
+                if user_id not in chat_histories: chat_histories[user_id] = []
+                history = chat_histories[user_id][-10:] # Nhớ 10 câu
 
-                # Cấu hình payload (Tắt bộ lọc an toàn)
+                # Payload chuẩn với Safety Settings TẮT HẾT
                 payload = {
-                    "contents": contents_payload,
+                    "contents": [
+                        {"role": "user", "parts": [{"text": WAIFU_PROMPT + "\n\n[BẮT ĐẦU NHIỆM VỤ]"}]},
+                        {"role": "model", "parts": [{"text": "Rõ. Đang chờ lệnh từ Captain."}]}
+                    ] + history + [{"role": "user", "parts": [{"text": user_input}]}],
+                    
                     "generationConfig": {
-                        "temperature": 0.9,
-                        "maxOutputTokens": 500
+                        "temperature": 0.8, # Giảm chút cho Sakura bớt "bay", lạnh lùng hơn
+                        "maxOutputTokens": 800
                     },
                     "safetySettings": [
                         {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
@@ -125,34 +103,40 @@ async def on_message(message):
                     ]
                 }
 
-                # Gọi API
                 async with aiohttp.ClientSession() as session:
                     async with session.post(API_URL, json=payload) as response:
                         if response.status == 200:
                             data = await response.json()
                             
-                            if 'candidates' in data and data['candidates'] and 'content' in data['candidates'][0]:
-                                ai_reply = data['candidates'][0]['content']['parts'][0]['text']
+                            # --- ĐOẠN FIX LỖI 'PARTS' Ở ĐÂY ---
+                            candidates = data.get('candidates', [])
+                            if candidates:
+                                content = candidates[0].get('content', {})
+                                parts = content.get('parts', [])
                                 
-                                # Lưu vào bộ nhớ
-                                chat_histories[user_id].append({"role": "user", "parts": [{"text": user_input}]})
-                                chat_histories[user_id].append({"role": "model", "parts": [{"text": ai_reply}]})
-                                
-                                await message.reply(ai_reply)
+                                if parts and 'text' in parts[0]:
+                                    ai_reply = parts[0]['text']
+                                    # Lưu history
+                                    chat_histories[user_id].append({"role": "user", "parts": [{"text": user_input}]})
+                                    chat_histories[user_id].append({"role": "model", "parts": [{"text": ai_reply}]})
+                                    await message.reply(ai_reply)
+                                else:
+                                    # Google trả lời rỗng (thường do Safety ngầm hoặc Recitation)
+                                    print(f"DATA RỖNG: {data}")
+                                    await message.reply("Thông tin này bị nhiễu sóng (Google chặn), Captain hỏi câu khác đi.")
                             else:
-                                print(f"Google chặn hoặc lỗi data: {data}")
-                                await message.reply("Ah... Ta không biết phải nói sao (Google chặn câu trả lời này rồi).")
+                                await message.reply("Mất kết nối máy chủ (No Candidates).")
+                        
+                        elif response.status == 429:
+                            await message.reply("Từ từ thôi Captain, hệ thống quá tải rồi (429).")
                         else:
-                            error_text = await response.text()
-                            print(f"API Error: {error_text}")
-                            await message.reply(f"Google đang lỗi (Code {response.status}).")
+                            await message.reply(f"Lỗi hệ thống: {response.status}")
 
             except Exception as e:
                 print(f"CRITICAL ERROR: {e}")
-                await message.reply(f"Code bị lỗi rồi bro ơi: {str(e)}")
+                await message.reply(f"Bug rồi Captain ơi: {e}")
 
     await bot.process_commands(message)
 
-# Chạy server
 keep_alive()
 bot.run(DISCORD_TOKEN)
