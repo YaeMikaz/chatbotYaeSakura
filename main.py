@@ -36,7 +36,7 @@ Lưu ý: Trả lời ngắn gọn, có thể nô đùa nhưng vẫn thuộc tín
 """
 
 # API URL (Dùng model 1.5 Flash mới nhất)
-API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-preview:generateContent?key={GEMINI_API_KEY}"
 
 # --- 4. KHỞI TẠO BOT ---
 intents = discord.Intents.default()
@@ -58,7 +58,7 @@ async def on_message(message):
 
     # --- CẤU HÌNH KÊNH CHAT RIÊNG ---
     # Thay số 000... bằng ID kênh của bro (Chuột phải kênh chat -> Copy Channel ID)
-    ALLOWED_CHANNEL_ID = 112233445566778899 
+    ALLOWED_CHANNEL_ID = 1440731715713892362 
 
     # Logic: Trả lời nếu được Tag HOẶC nhắn trong kênh riêng HOẶC nhắn tin riêng (DM)
     should_reply = (
