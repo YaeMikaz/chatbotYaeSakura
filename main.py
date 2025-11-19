@@ -47,7 +47,7 @@ generation_config = {
 }
 
 model = genai.GenerativeModel(
-    model_name="gemini-1.5-flash", # Bản Flash nhanh và rẻ (free)
+    model_name="gemini-1.5-flash-latest", # Bản Flash nhanh và rẻ (free)
     generation_config=generation_config,
     system_instruction=WAIFU_PERSONA 
 )
