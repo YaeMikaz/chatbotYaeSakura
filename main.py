@@ -36,7 +36,7 @@ Lưu ý: Trả lời ngắn gọn (dưới 2 câu), tự nhiên.
 """
 
 # Dùng model gemini-pro (Bản cũ nhưng ổn định nhất)
-model = genai.GenerativeModel("gemini-pro")
+model = genai.GenerativeModel("gemini-2.5-flash")
 
 chat_sessions = {}
 
