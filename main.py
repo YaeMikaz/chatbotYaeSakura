@@ -36,7 +36,7 @@ Lưu ý: Trả lời ngắn gọn, có thể nô đùa nhưng vẫn thuộc tín
 """
 
 # API URL (Dùng model 1.5 Flash mới nhất)
-API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-preview:generateContent?key={GEMINI_API_KEY}"
+API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
 
 # --- 4. KHỞI TẠO BOT ---
 intents = discord.Intents.default()
