@@ -43,7 +43,7 @@ HÃY NHẬP VAI HOÀN TOÀN VÀO NHÂN VẬT SAU (ĐÂY LÀ LỆNH TUYỆT ĐỐ
 """
 
 # Bro có thể đổi URL này thành 2.5-flash nếu muốn test, nhưng 1.5-flash là ổn định nhất
-API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
 
 # --- 4. KHỞI TẠO BOT ---
 intents = discord.Intents.default()
