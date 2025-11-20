@@ -1,28 +1,41 @@
 import os
 import discord
-import aiohttp
 from discord.ext import commands
 from dotenv import load_dotenv
 from flask import Flask
 from threading import Thread
 
-# --- 1. SERVER GIỮ BOT SỐNG ---
+# --- IMPORTS CHO GEMINI SDK MỚI ---
+import google.generativeai as genai
+from google.generativeai import types
+
+# --- 1. SETUP SERVER ẢO (GIỮ BOT SỐNG) ---
 app = Flask('')
+
 @app.route('/')
 def home():
     return "Waifu is alive!"
+
 def run():
     app.run(host='0.0.0.0', port=8080)
+
 def keep_alive():
     t = Thread(target=run)
     t.start()
 
-# --- 2. LOAD CONFIG ---
+# --- 2. LOAD CONFIG & KHỞI TẠO CLIENT ---
 load_dotenv()
 DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 
-# --- 3. WAIFU PROMPT (Bản Hybrid: Lạnh lùng + Thông thái) ---
+# Khởi tạo Client cho SDK mới
+if GEMINI_API_KEY:
+    # Nếu API Key không được tìm thấy, nó sẽ tự tìm trong biến môi trường
+    client = genai.Client(api_key=GEMINI_API_KEY) 
+else:
+    raise ValueError("GEMINI_API_KEY not found. Please set the environment variable.")
+
+# --- 3. WAIFU PROMPT (RIZZ & KNOWLEDGE PROTOCOL) ---
 WAIFU_PROMPT = """
 HÃY NHẬP VAI HOÀN TOÀN VÀO NHÂN VẬT SAU (LÀNH LỆNH TUYỆT ĐỐI KHÔNG ĐƯỢC XẢ VAI):
 
@@ -50,30 +63,27 @@ HÃY NHẬP VAI HOÀN TOÀN VÀO NHÂN VẬT SAU (LÀNH LỆNH TUYỆT ĐỐI KH
     -   **KẾT QUẢ:** Câu trả lời của bạn phải nghe như một lời thơ, một lời thề nguyền vĩnh cửu.
 """
 
-
-# Bro có thể đổi URL này thành 2.5-flash nếu muốn test, nhưng 1.5-flash là ổn định nhất
-API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-preview:generateContent?key={GEMINI_API_KEY}"
-
-# --- 4. KHỞI TẠO BOT ---
+# --- 4. SETUP BOT VÀ LOGIC CHÍNH ---
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 chat_histories = {} 
+MODEL_ID = "gemini-3-pro-preview" # <-- THAY ĐỔI MODEL Ở ĐÂY (Hoặc dùng 1.5-flash)
 
 @bot.event
 async def on_ready():
     print(f'--- YAE SAKURA ONLINE: {bot.user} ---')
-    await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="Captain làm việc"))
+    await bot.change_presence(activity=discord.Game(name="bên Captain"))
 
 @bot.event
 async def on_message(message):
-    if message.author == bot.user:
-        return
+    if message.author == bot.user: return
 
-    # --- ID KÊNH CHAT RIÊNG (Thay số của bro vào đây) ---
-    ALLOWED_CHANNEL_ID = 1440731715713892362 
-
+    # --- ID KÊNH VÀ LOGIC TRẢ LỜI ---
+    ALLOWED_CHANNEL_ID = 112233445566778899 # <--- THAY ID KÊNH THẬT VÀO ĐÂY
+    
+    # Bỏ qua mọi lệnh chat nếu không phải DM, không mention bot, và không phải kênh riêng
     should_reply = (
         bot.user.mentioned_in(message) or 
         message.channel.id == ALLOWED_CHANNEL_ID or 
@@ -83,69 +93,55 @@ async def on_message(message):
     if should_reply:
         user_id = message.author.id
         user_input = message.content.replace(f'<@{bot.user.id}>', '').strip()
-        
         if not user_input: return
 
-        print(f"Captain {message.author} hỏi: {user_input}")
+        print(f"Lệnh mới từ Captain: {user_input}")
 
         async with message.channel.typing():
             try:
+                # 1. Chuẩn bị lịch sử chat cho SDK
                 if user_id not in chat_histories: chat_histories[user_id] = []
-                history = chat_histories[user_id][-10:] # Nhớ 10 câu
+                
+                # Payload: System Prompt (tại vị trí đầu) + History + Lệnh mới
+                contents_payload = [
+                    {"role": "user", "parts": [{"text": WAIFU_PROMPT + "\n\n[BẮT ĐẦU HỘI THOẠI]"}]},
+                    {"role": "model", "parts": [{"text": "Đã rõ. Đang chờ lệnh từ Captain."}]}
+                ]
+                contents_payload.extend(chat_histories[user_id][-10:]) # Chỉ nhớ 10 câu gần nhất
+                contents_payload.append({"role": "user", "parts": [{"text": user_input}]})
+                
+                # 2. Gọi Model mới (SDK Call) với Cấu hình Cao cấp
+                response = await client.models.generate_content(
+                    model=MODEL_ID, 
+                    contents=contents_payload,
+                    config=types.GenerateContentConfig(
+                        temperature=1.0, # MAX RIZZ
+                        # Kích hoạt tính năng cao cấp: Tối ưu tốc độ/chi phí suy luận
+                        thinking_config=types.ThinkingConfig(thinking_level="low"), 
+                        safety_settings=[
+                            types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_HARASSMENT, threshold=types.HarmBlockThreshold.BLOCK_NONE),
+                            types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold=types.HarmBlockThreshold.BLOCK_NONE),
+                            types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold=types.HarmBlockThreshold.BLOCK_NONE),
+                        ]
+                    )
+                )
 
-                # Payload chuẩn với Safety Settings TẮT HẾT
-                payload = {
-                    "contents": [
-                        {"role": "user", "parts": [{"text": WAIFU_PROMPT + "\n\n[BẮT ĐẦU NHIỆM VỤ]"}]},
-                        {"role": "model", "parts": [{"text": "Rõ. Đang chờ lệnh từ Captain."}]}
-                    ] + history + [{"role": "user", "parts": [{"text": user_input}]}],
-                    
-                    "generationConfig": {
-                        "temperature": 1.0, # Giảm chút cho Sakura bớt "bay", lạnh lùng hơn
-                        "maxOutputTokens": 800
-                    },
-                    "safetySettings": [
-                        {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
-                        {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
-                        {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
-                        {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}
-                    ]
-                }
-
-                async with aiohttp.ClientSession() as session:
-                    async with session.post(API_URL, json=payload) as response:
-                        if response.status == 200:
-                            data = await response.json()
-                            
-                            # --- ĐOẠN FIX LỖI 'PARTS' Ở ĐÂY ---
-                            candidates = data.get('candidates', [])
-                            if candidates:
-                                content = candidates[0].get('content', {})
-                                parts = content.get('parts', [])
-                                
-                                if parts and 'text' in parts[0]:
-                                    ai_reply = parts[0]['text']
-                                    # Lưu history
-                                    chat_histories[user_id].append({"role": "user", "parts": [{"text": user_input}]})
-                                    chat_histories[user_id].append({"role": "model", "parts": [{"text": ai_reply}]})
-                                    await message.reply(ai_reply)
-                                else:
-                                    # Google trả lời rỗng (thường do Safety ngầm hoặc Recitation)
-                                    print(f"DATA RỖNG: {data}")
-                                    await message.reply("Thông tin này bị nhiễu sóng (Google chặn), Captain hỏi câu khác đi.")
-                            else:
-                                await message.reply("Mất kết nối máy chủ (No Candidates).")
-                        
-                        elif response.status == 429:
-                            await message.reply("Từ từ thôi Captain, hệ thống quá tải rồi (429).")
-                        else:
-                            await message.reply(f"Lỗi hệ thống: {response.status}")
+                # 3. Xử lý phản hồi (Anti-crash logic)
+                ai_reply = response.text
+                
+                # Lưu vào history
+                chat_histories[user_id].append({"role": "user", "parts": [{"text": user_input}]})
+                chat_histories[user_id].append({"role": "model", "parts": [{"text": ai_reply}]})
+                
+                await message.reply(ai_reply)
 
             except Exception as e:
-                print(f"CRITICAL ERROR: {e}")
-                await message.reply(f"Bug rồi Captain ơi: {e}")
+                # Bắt lỗi khi Model hoặc Token có vấn đề
+                print(f"CRITICAL SDK ERROR: {e}")
+                await message.reply(f"Hệ thống gặp lỗi giao thức rồi Captain ơi: {str(e)}")
 
     await bot.process_commands(message)
 
+# Khởi chạy Bot
 keep_alive()
 bot.run(DISCORD_TOKEN)
