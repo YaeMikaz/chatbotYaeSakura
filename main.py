@@ -49,8 +49,8 @@ intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 chat_histories = {} 
-# Dùng model Flash cho nhanh và miễn phí tốt trên Render, hoặc dùng "gemini-1.5-pro"
-MODEL_ID = "gemini-1.5-flash" 
+# Dùng model Flash cho nhanh và miễn phí tốt trên Render, hoặc dùng "gemini-2.5-pro"
+MODEL_ID = "gemini-2.5-flash" 
 
 # Cấu hình Model
 generation_config = {
