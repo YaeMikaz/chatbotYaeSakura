@@ -1,6 +1,6 @@
 discord.py
 # Đảm bảo cài bản mới nhất hỗ trợ cấu hình này
-google-generativeai>=0.8.0 
+google-generativeai
 python-dotenv
 flask
 aiohttp
