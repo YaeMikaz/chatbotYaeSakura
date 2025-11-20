@@ -1,6 +1,4 @@
 discord.py
-# Đảm bảo cài bản mới nhất hỗ trợ cấu hình này
-google-generativeai
-python-dotenv
 flask
-aiohttp
+python-dotenv
+google-generativeai
