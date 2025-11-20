@@ -84,7 +84,7 @@ async def on_message(message):
     if message.author == bot.user: return
 
     # --- THAY ID KÊNH CỦA BRO VÀO ĐÂY ---
-    ALLOWED_CHANNEL_ID = 112233445566778899 
+    ALLOWED_CHANNEL_ID = 1440731715713892362 
     
     should_reply = (
         bot.user.mentioned_in(message) or 
